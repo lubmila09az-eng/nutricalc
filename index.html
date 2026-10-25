@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f9e5e">
+<title>НутриКалк — калькулятор калорий и здорового питания</title>
+<style>
+/* ==========================================================
+   Дизайн-токены. Цвета и радиусы меняются здесь.
+   ========================================================== */
+:root{
+  --bg:#f4f9f5; --surface:#fff; --text:#1c2a22; --muted:#66786d; --line:#e3ece6;
+  --green:#2f9e5e; --green-d:#237a49; --green-soft:#e7f5ec;
+  --amber:#e8a317; --amber-soft:#fff4d9; --red:#d9534f; --red-soft:#fdeceb;
+  --blue:#3b82c4; --blue-soft:#e8f1fa;
+  --c-kcal:#2f9e5e; --c-protein:#3b82c4; --c-fat:#e8a317; --c-carbs:#8b6fd1;
+  --r:16px; --r-s:12px;
+  --shadow:0 1px 2px rgba(20,50,30,.05),0 8px 24px rgba(20,50,30,.07);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+/* Фон — зелёный градиент с точечным узором: нигде нет «белого» пространства */
+body{margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;color:var(--text);
+  background:
+    radial-gradient(900px 520px at 6% -4%,rgba(47,158,94,.30),transparent 62%),
+    radial-gradient(800px 520px at 100% 8%,rgba(139,111,209,.16),transparent 62%),
+    radial-gradient(760px 520px at 92% 100%,rgba(232,163,23,.18),transparent 62%),
+    linear-gradient(180deg,#dcefe3,#d3ead9);
+  background-attachment:fixed;
+  font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:radial-gradient(rgba(35,122,73,.16) 1.3px,transparent 1.3px);background-size:22px 22px}
+h1,h2,h3,p,ul{margin:0}
+h1,h2,h3{line-height:1.2;letter-spacing:-.01em}
+h1{font-size:clamp(1.5rem,1.2rem + 1.4vw,2rem)}
+h2{font-size:1.1rem}
+ul{padding:0;list-style:none}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid rgba(47,158,94,.45);outline-offset:2px}
+[hidden]{display:none!important}
+.num,.tnum{font-variant-numeric:tabular-nums}
+
+/* ---------- Шапка и навигация ---------- */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.86);
+  backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1100px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.1rem}
+.brand-ico{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:var(--green-soft)}
+.tabs{display:flex;gap:4px}
+.tabs a{padding:9px 14px;border-radius:999px;color:var(--muted);font-weight:600;transition:background .2s,color .2s}
+.tabs a:hover{background:var(--green-soft);color:var(--green-d)}
+.tabs a[aria-current="page"]{background:var(--green);color:#fff}
+.bottomnav{display:none}
+main{width:100%;max-width:1100px;margin:0 auto;padding:24px 20px 32px;flex:1;display:flex;flex-direction:column}
+@media (max-width:719px){
+  .tabs{display:none}
+  .bottomnav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;
+    background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-top:1px solid var(--line);
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .bottomnav a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:12px;
+    font-size:.72rem;font-weight:600;color:var(--muted);transition:background .2s,color .2s}
+  .bottomnav .ni{font-size:1.3rem;line-height:1}
+  .bottomnav a[aria-current="page"]{color:var(--green-d);background:var(--green-soft)}
+  main{padding:16px 16px calc(96px + env(safe-area-inset-bottom))}
+}
+
+/* ---------- Каркас страниц ---------- */
+.view{display:none}
+.view.active{display:flex;flex-direction:column;flex:1;animation:fadeUp .4s ease both}
+.view.active>.grid-2,.view.active>.card{flex:1}
+#statsBody{flex:1;display:flex;flex-direction:column}
+#statsBody>.card:last-child{flex:1;display:flex;align-items:center;background:var(--green-soft);box-shadow:none}
+#statsBody>.card:last-child .data-tools{width:100%}
+.page-head .lead{text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.page-head{margin-bottom:20px}
+.page-head .lead{color:var(--muted);margin-top:6px;max-width:60ch}
+.row-between{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+.grid-2{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:stretch}
+@media (min-width:900px){.grid-2{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}}
+.stack{display:grid;gap:16px;grid-template-rows:auto 1fr}
+/* Карточки растягиваются по высоте, а нижняя часть заполняется полезным блоком */
+.card.fill{display:flex;flex-direction:column}
+/* Нижний блок карточки растёт и забирает всё свободное место */
+.card.fill>.push{flex:1}
+.info-box{margin-top:16px;padding:16px;border-radius:var(--r-s);background:var(--green-soft);color:var(--green-d);font-size:.9rem}
+.info-box.push{display:flex;flex-direction:column;justify-content:center;font-size:.95rem}
+.info-box b{display:block;margin-bottom:4px}
+.quick-add{margin-top:16px;padding:16px;border-radius:var(--r-s);background:var(--green-soft);display:flex;flex-direction:column;justify-content:center}
+.quick-add .label{margin-bottom:8px;color:var(--green-d)}
+#calcResult{display:flex;flex-direction:column}
+#calcResult .result-hero{flex:1;display:flex;flex-direction:column;justify-content:center}
+#calcResult .empty{margin:auto}
+#calcResult.stale{opacity:.45;transition:opacity .2s}
+.sample-banner{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:16px;border-radius:var(--r);background:var(--amber-soft);color:#7a5200;font-size:.92rem}
+.empty-try{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.card{background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow);padding:20px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.pill{font-size:.8rem;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--green-soft);color:var(--green-d)}
+.note{color:var(--muted);font-size:.85rem;margin-top:12px}
+.note a{color:var(--green-d);font-weight:600;text-decoration:underline}
+
+/* ---------- Формы ---------- */
+.field{margin-bottom:16px}
+.label{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:6px}
+.input-wrap{position:relative}
+.input-wrap .unit{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;pointer-events:none}
+input[type=number],input[type=search],input[type=date],select{
+  width:100%;height:46px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--r-s);background:#fff;
+  transition:border-color .2s,box-shadow .2s;appearance:none;-webkit-appearance:none;-moz-appearance:textfield}
+.input-wrap input{padding-right:48px}
+select{padding-right:38px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%2366786d' stroke-width='2'%3E%3Cpath d='m1 1 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input:hover,select:hover{border-color:#c9dccf}
+input:focus,select:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 4px rgba(47,158,94,.15)}
+input[aria-invalid="true"],select[aria-invalid="true"]{border-color:var(--red);box-shadow:0 0 0 4px rgba(217,83,79,.12)}
+.err{color:var(--red);font-size:.82rem;min-height:0;margin-top:4px}
+.err:empty{display:none}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0 12px}
+.seg{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:#eef4ef;padding:4px;border-radius:var(--r-s)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{text-align:center;padding:10px 8px;border-radius:9px;cursor:pointer;font-weight:600;color:var(--muted);font-size:.92rem;transition:background .2s,color .2s,box-shadow .2s}
+.seg label:hover{color:var(--text)}
+.seg input:checked+label{background:#fff;color:var(--green-d);box-shadow:0 1px 4px rgba(20,50,30,.12)}
+.seg input:focus-visible+label{outline:3px solid rgba(47,158,94,.45);outline-offset:1px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 20px;border:0;border-radius:var(--r-s);
+  background:var(--green);color:#fff;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(47,158,94,.28);
+  transition:transform .15s,box-shadow .2s,background .2s}
+.btn:hover{background:var(--green-d);transform:translateY(-1px)}
+.btn:active{transform:none}
+.btn.ghost{background:transparent;color:var(--green-d);box-shadow:none;border:1.5px solid var(--line)}
+.btn.ghost:hover{background:var(--green-soft)}
+.btn.danger{color:var(--red)}
+.btn.danger:hover{background:var(--red-soft)}
+.btn.small{min-height:36px;padding:0 14px;font-size:.9rem}
+.btn.block{width:100%}
+.icon-btn{display:inline-grid;place-items:center;width:40px;height:40px;border:1.5px solid var(--line);border-radius:var(--r-s);background:#fff;cursor:pointer;
+  color:var(--muted);transition:background .2s,color .2s,border-color .2s}
+.icon-btn:hover{background:var(--green-soft);color:var(--green-d);border-color:#cfe5d7}
+.icon-btn.del:hover{background:var(--red-soft);color:var(--red);border-color:#f3c9c7}
+.date-nav{display:flex;gap:8px;align-items:center}
+.date-nav input[type=date]{width:auto;min-width:150px}
+.preview{margin:-4px 0 16px;padding:10px 12px;border-radius:var(--r-s);background:var(--green-soft);color:var(--green-d);font-size:.9rem;font-weight:600}
+.preview.muted{background:#f1f5f2;color:var(--muted);font-weight:500}
+
+/* ---------- Калькулятор: результат ---------- */
+.result-hero{padding:20px;border-radius:14px;color:#fff;background:linear-gradient(135deg,#34a869,#1f8a52)}
+.hero-label{opacity:.9;font-size:.9rem}
+.hero-num{font-size:clamp(2.4rem,2rem + 2vw,3.2rem);font-weight:800;line-height:1.1;margin:4px 0}
+.hero-num small{font-size:1.1rem;font-weight:600;opacity:.9}
+.hero-sub{opacity:.92;font-size:.9rem}
+.macro-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.tile{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:12px;position:relative;overflow:hidden}
+.tile::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--c)}
+.tile .t-name{font-size:.8rem;color:var(--muted);font-weight:600;margin-top:2px}
+.tile .t-val{font-size:1.4rem;font-weight:800;line-height:1.2}
+.tile .t-val small{font-size:.8rem;font-weight:600;color:var(--muted)}
+.tile .t-share{font-size:.78rem;color:var(--muted)}
+.bmi{border-top:1px solid var(--line);padding-top:16px;margin-top:6px}
+.bmi-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:12px}
+.bmi-head .bmi-val{font-size:1.5rem;font-weight:800}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:.8rem;font-weight:700}
+.badge.low{background:var(--blue-soft);color:#245f94}
+.badge.ok{background:var(--green-soft);color:var(--green-d)}
+.badge.high{background:var(--amber-soft);color:#8a5d00}
+.badge.obese{background:var(--red-soft);color:#a8332f}
+.bmi-scale{position:relative;display:flex;height:10px;border-radius:99px;overflow:hidden;margin:6px 0 4px}
+.bmi-scale i{display:block;height:100%}
+.bmi-scale .b-low{background:#8ab9e3}.bmi-scale .b-ok{background:#5cc088}
+.bmi-scale .b-high{background:#f0c25a}.bmi-scale .b-obese{background:#e98a86}
+.bmi-track{position:relative}
+.bmi-marker{position:absolute;top:-4px;width:4px;height:18px;margin-left:-2px;border-radius:2px;background:var(--text);box-shadow:0 0 0 2px #fff}
+.bmi-legend{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-top:6px}
+.bmi-hint{font-size:.85rem;color:var(--muted);margin-top:10px}
+.warn-box{margin-top:12px;padding:10px 12px;border-radius:var(--r-s);background:var(--amber-soft);color:#7a5200;font-size:.88rem}
+.saved-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between;margin-top:16px}
+.saved-note span{color:var(--muted);font-size:.85rem}
+.pop{animation:pop .35s ease both}
+
+/* ---------- Прогресс-бары ---------- */
+.prog{margin-bottom:16px}
+.prog:last-child{margin-bottom:0}
+.prog-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;font-size:.92rem}
+.prog-name{display:flex;align-items:center;gap:8px;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.prog-val{color:var(--muted);font-size:.88rem}
+.prog-val b{color:var(--text)}
+.bar{height:10px;background:#eaf1ec;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;border-radius:99px;background:var(--c);transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.bar[data-state="warn"]>i{background:var(--amber)}
+.bar[data-state="over"]>i{background:var(--red)}
+.prog-foot{font-size:.78rem;color:var(--muted);margin-top:4px}
+.prog-foot.over{color:var(--red)}
+
+/* ---------- Список дневника ---------- */
+.entries{display:grid;gap:8px}
+.entry{display:flex;align-items:center;gap:12px;padding:12px;border:1.5px solid var(--line);border-radius:14px;
+  animation:fadeUp .3s ease both;transition:opacity .2s,transform .2s,max-height .25s,margin .25s,padding .25s}
+.entry:hover{border-color:#cfe5d7;background:#fbfefc}
+.entry.removing{opacity:0;transform:translateX(24px)}
+.entry-main{flex:1;min-width:0}
+.entry-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry-meta{font-size:.82rem;color:var(--muted)}
+.entry-kcal{font-weight:800;white-space:nowrap}
+.entry-kcal small{font-weight:600;color:var(--muted)}
+
+/* ---------- Продукты ---------- */
+.toolbar{display:grid;gap:12px;margin-bottom:12px}
+@media (min-width:760px){.toolbar{grid-template-columns:minmax(220px,300px) 1fr;align-items:center}}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;
+  transition:background .2s,color .2s,border-color .2s}
+.chip:hover{border-color:#cfe5d7;color:var(--green-d)}
+.chip[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.table-wrap{overflow-x:auto;margin:0 -8px;padding:0 8px}
+table{width:100%;border-collapse:collapse;min-width:440px}
+th,td{padding:10px 8px;text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+thead th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1.5px solid var(--line);font-weight:700}
+.th-btn{background:none;border:0;padding:0;cursor:pointer;font:inherit;text-transform:inherit;letter-spacing:inherit;color:inherit;font-weight:inherit}
+.th-btn:hover{color:var(--green-d)}
+tbody tr{border-bottom:1px solid var(--line);animation:fadeIn .3s ease both;transition:background .15s}
+tbody tr:hover{background:var(--green-soft)}
+.fname{font-weight:600}
+.fcat{font-size:.78rem;color:var(--muted)}
+td.strong{font-weight:700}
+.col-act{width:1%}
+@media (max-width:519px){.hide-sm{display:none}}
+
+/* ---------- Статистика ---------- */
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:16px}
+.stat .s-label{color:var(--muted);font-size:.82rem;font-weight:600}
+.stat .s-val{font-size:1.7rem;font-weight:800;line-height:1.2;margin-top:2px}
+.stat .s-val small{font-size:.85rem;color:var(--muted);font-weight:600}
+.stat .s-sub{font-size:.8rem;color:var(--muted)}
+.chart-card{margin-bottom:16px}
+.chart-box{width:100%;min-height:260px}
+.chart{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-size:12px;fill:var(--muted);font-family:inherit}
+.chart .val{font-size:11px;fill:var(--text);font-weight:700}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .goal{stroke:var(--green-d);stroke-width:1.5;stroke-dasharray:5 4}
+.chart .goal-t{fill:var(--green-d);font-weight:700}
+.bar-rect{transform-box:fill-box;transform-origin:bottom;animation:grow .7s cubic-bezier(.2,.8,.2,1) both}
+.bar-low{fill:#8fd1a9}.bar-ok{fill:var(--green)}.bar-high{fill:var(--amber)}
+.line-path{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;animation:fadeIn .8s ease both}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.data-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.data-tools p{flex:1 1 220px;color:var(--muted);font-size:.85rem}
+
+/* ---------- Пустые состояния, тост, диалог ---------- */
+.empty{text-align:center;padding:32px 16px;color:var(--muted)}
+.empty .ico{font-size:44px;line-height:1;margin-bottom:8px}
+.empty h3{color:var(--text);font-size:1.05rem;margin-bottom:4px}
+.empty .btn{margin-top:14px}
+.toast{position:fixed;left:50%;bottom:24px;z-index:60;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  background:#1c2a22;color:#fff;padding:12px 18px;border-radius:12px;font-size:.92rem;font-weight:600;max-width:calc(100vw - 32px);
+  box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .25s,transform .25s}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.error{background:var(--red)}
+@media (max-width:719px){.toast{bottom:calc(88px + env(safe-area-inset-bottom))}}
+dialog{border:0;border-radius:20px;padding:0;width:min(420px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(20,50,30,.3);color:var(--text)}
+dialog[open]{animation:pop .25s ease both}
+dialog::backdrop{background:rgba(20,40,30,.4);backdrop-filter:blur(2px)}
+.dlg{padding:24px}
+.dlg h2{margin-bottom:2px}
+.dlg .sub{color:var(--muted);font-size:.88rem;margin-bottom:16px}
+.quick{display:flex;gap:6px;margin:-6px 0 16px;flex-wrap:wrap}
+.dlg-actions{display:flex;gap:10px}
+.dlg-actions .btn{flex:1}
+.footer-note{width:100%;max-width:1100px;margin:0 auto;padding:0 20px 24px;color:#3f5a4a;font-size:.85rem;text-align:center;display:grid;gap:6px}
+.footer-note a{color:var(--green-d);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.footer-note a:hover{color:var(--green)}
+.footer-note .author{color:var(--text)}
+@media (max-width:719px){
+  main{padding-bottom:16px!important}
+  .footer-note{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+}
+
+/* ---------- Бегущая строка ---------- */
+.ticker{border-top:1px solid var(--line);background:var(--green-soft);overflow:hidden;font-size:.88rem;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent)}
+.ticker-track{display:flex;width:max-content;animation:marquee var(--dur,60s) linear infinite}
+.ticker:hover .ticker-track,.ticker:focus-within .ticker-track{animation-play-state:paused}
+.ticker-group{display:flex;flex-shrink:0;align-items:center}
+.ticker-item{padding:8px 0;white-space:nowrap;color:var(--green-d);font-weight:600}
+.ticker-item::after{content:"•";margin:0 22px;opacity:.45}
+.ticker-item a{text-decoration:underline;text-underline-offset:3px}
+.ticker-item a:hover{color:var(--text)}
+@keyframes marquee{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){
+  .ticker{-webkit-mask-image:none;mask-image:none;overflow-x:auto}
+  .ticker-track{animation:none}
+  .ticker-group[aria-hidden="true"]{display:none}
+}
+
+/* ---------- Анимации ---------- */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#calc" aria-label="НутриКалк — на главную"><span class="brand-ico" aria-hidden="true">🥗</span><span>НутриКалк</span></a>
+    <nav class="tabs" aria-label="Основная навигация">
+      <a href="#calc" data-tab="calc">Калькулятор</a>
+      <a href="#diary" data-tab="diary">Дневник</a>
+      <a href="#foods" data-tab="foods">Продукты</a>
+      <a href="#stats" data-tab="stats">Статистика</a>
+    </nav>
+  </div>
+  <!-- Бегущая строка: содержимое задаётся в CONFIG.TICKER и CONFIG.AUTHOR -->
+  <div class="ticker" id="ticker" role="marquee" aria-label="Полезные советы и контакты автора"></div>
+</header>
+
+<main id="main">
+  <noscript><div class="card">Для работы приложения нужен включённый JavaScript.</div></noscript>
+
+  <!-- ===== 1. Калькулятор ===== -->
+  <section class="view" id="view-calc" aria-labelledby="h-calc">
+    <div class="page-head">
+      <h1 id="h-calc" tabindex="-1">Калькулятор калорий</h1>
+      <p class="lead">Суточная норма калорий и БЖУ по формуле Миффлина — Сан Жеора. Результат пересчитывается по мере ввода.</p>
+    </div>
+    <div class="grid-2">
+      <form class="card fill" id="calcForm" novalidate autocomplete="off">
+        <div class="field">
+          <span class="label" id="l-sex">Пол</span>
+          <div class="seg" role="radiogroup" aria-labelledby="l-sex">
+            <input type="radio" name="sex" id="sex-male" value="male" checked><label for="sex-male">Мужчина</label>
+            <input type="radio" name="sex" id="sex-female" value="female"><label for="sex-female">Женщина</label>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="label" for="age">Возраст</label>
+            <div class="input-wrap"><input id="age" name="age" type="number" inputmode="numeric" min="14" max="100" step="1" placeholder="30" aria-describedby="err-age"><span class="unit">лет</span></div>
+            <p class="err" id="err-age" role="alert"></p>
+          </div>
+          <div class="field">
+            <label class="label" for="height">Рост</label>
+            <div class="input-wrap"><input id="height" name="height" type="number" inputmode="decimal" min="100" max="250" step="any" placeholder="175" aria-describedby="err-height"><span class="unit">см</span></div>
+            <p class="err" id="err-height" role="alert"></p>
+          </div>
+          <div class="field">
+            <label class="label" for="weight">Вес</label>
+            <div class="input-wrap"><input id="weight" name="weight" type="number" inputmode="decimal" min="30" max="300" step="any" placeholder="70" aria-describedby="err-weight"><span class="unit">кг</span></div>
+            <p class="err" id="err-weight" role="alert"></p>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="activity">Уровень активности</label>
+          <select id="activity" name="activity"></select>
+        </div>
+        <div class="field">
+          <span class="label" id="l-goal">Цель</span>
+          <div class="seg" role="radiogroup" aria-labelledby="l-goal" id="goalSeg"></div>
+        </div>
+        <div class="info-box push">
+          <b>Как считаем</b>
+          Основной обмен по формуле Миффлина — Сан Жеора: 10 × вес (кг) + 6,25 × рост (см) − 5 × возраст + 5 для мужчин или − 161 для женщин. Затем результат умножается на коэффициент активности. При похудении калорийность уменьшается на 15%, при наборе массы увеличивается на 10%.
+        </div>
+      </form>
+
+      <div class="card fill" id="calcResult" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ===== 2. Дневник ===== -->
+  <section class="view" id="view-diary" aria-labelledby="h-diary">
+    <div class="page-head row-between">
+      <div>
+        <h1 id="h-diary" tabindex="-1">Дневник питания</h1>
+        <p class="lead" id="diaryDateLabel"></p>
+      </div>
+      <div class="date-nav">
+        <button type="button" class="icon-btn" id="datePrev" aria-label="Предыдущий день">‹</button>
+        <input type="date" id="diaryDate" aria-label="Дата дневника">
+        <button type="button" class="icon-btn" id="dateNext" aria-label="Следующий день">›</button>
+        <button type="button" class="btn ghost small" id="dateToday">Сегодня</button>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="stack">
+        <form class="card" id="addForm" novalidate autocomplete="off">
+          <h2 style="margin-bottom:14px">Добавить продукт</h2>
+          <div class="field">
+            <label class="label" for="foodSelect">Продукт</label>
+            <select id="foodSelect" aria-describedby="err-food"></select>
+            <p class="err" id="err-food" role="alert"></p>
+          </div>
+          <div class="field">
+            <label class="label" for="gramsInput">Порция</label>
+            <div class="input-wrap"><input id="gramsInput" type="number" inputmode="decimal" min="1" max="5000" step="any" placeholder="100" aria-describedby="err-grams"><span class="unit">г</span></div>
+            <p class="err" id="err-grams" role="alert"></p>
+          </div>
+          <div class="preview muted" id="addPreview"></div>
+          <button class="btn block" type="submit">Добавить в дневник</button>
+        </form>
+        <div class="card fill">
+          <div class="card-head"><h2>Итог за день</h2></div>
+          <div id="dayProgress"></div>
+          <p class="note" id="goalsNote"></p>
+          <div class="info-box push" id="dayTip"></div>
+        </div>
+      </div>
+      <div class="card fill">
+        <div class="card-head"><h2>Съедено</h2><span class="pill" id="entryCount"></span></div>
+        <ul class="entries" id="entryList"></ul>
+        <div class="quick-add push">
+          <span class="label">Быстро добавить (подставит 100 г в форму)</span>
+          <div class="chips" id="quickChips"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3. Продукты ===== -->
+  <section class="view" id="view-foods" aria-labelledby="h-foods">
+    <div class="page-head">
+      <h1 id="h-foods" tabindex="-1">Продукты</h1>
+      <p class="lead">Значения на 100 г продукта — усреднённые, ориентировочные. Крупы и макароны указаны в сухом виде.</p>
+    </div>
+    <div class="card fill">
+      <div class="toolbar">
+        <input type="search" id="foodSearch" placeholder="Поиск продукта…" aria-label="Поиск продукта">
+        <div class="chips" id="foodChips" role="group" aria-label="Категории"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col"><button class="th-btn" data-sort="name">Продукт <span class="arr"></span></button></th>
+              <th scope="col"><button class="th-btn" data-sort="kcal">Ккал <span class="arr"></span></button></th>
+              <th scope="col"><button class="th-btn" data-sort="protein">Б <span class="arr"></span></button></th>
+              <th scope="col"><button class="th-btn" data-sort="fat">Ж <span class="arr"></span></button></th>
+              <th scope="col"><button class="th-btn" data-sort="carbs">У <span class="arr"></span></button></th>
+              <th scope="col"><span class="sr-only" style="position:absolute;left:-9999px">Действие</span></th>
+            </tr>
+          </thead>
+          <tbody id="foodRows"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="foodEmpty" hidden>
+        <div class="ico">🔍</div><h3>Ничего не найдено</h3><p>Попробуйте другой запрос или категорию.</p>
+        <div class="empty-try" id="foodTry"></div>
+        <button class="btn ghost small" type="button" id="foodReset" style="margin-top:12px">Сбросить фильтры</button>
+      </div>
+      <p class="note" id="foodCount"></p>
+      <div class="info-box push">
+        <b>Как читать таблицу</b>
+        Б — белки, Ж — жиры, У — углеводы, все значения указаны на 100 г продукта. Один грамм белка или углеводов даёт около 4 ккал, один грамм жира — около 9 ккал. Нажмите на заголовок столбца, чтобы отсортировать продукты, а на «В дневник» — чтобы добавить порцию в сегодняшний день.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 4. Статистика ===== -->
+  <section class="view" id="view-stats" aria-labelledby="h-stats">
+    <div class="page-head">
+      <h1 id="h-stats" tabindex="-1">Статистика за 7 дней</h1>
+      <p class="lead">Средние значения считаются по дням, в которых есть записи. Цели берутся из калькулятора.</p>
+    </div>
+    <div id="statsBody"></div>
+  </section>
+</main>
+
+<footer class="footer-note">
+  <p>Расчёты ориентировочные и не заменяют консультацию врача или диетолога.</p>
+  <p class="author">Автор: <b id="authorName"></b> · <a id="authorMail" href="mailto:lubmila09az@gmail.com">lubmila09az@gmail.com</a></p>
+</footer>
+
+<nav class="bottomnav" aria-label="Основная навигация (мобильная)">
+  <a href="#calc" data-tab="calc"><span class="ni" aria-hidden="true">🧮</span>Калькулятор</a>
+  <a href="#diary" data-tab="diary"><span class="ni" aria-hidden="true">📓</span>Дневник</a>
+  <a href="#foods" data-tab="foods"><span class="ni" aria-hidden="true">🍎</span>Продукты</a>
+  <a href="#stats" data-tab="stats"><span class="ni" aria-hidden="true">📊</span>Статистика</a>
+</nav>
+
+<!-- Диалог «Добавить в дневник» (вкладка «Продукты») -->
+<dialog id="addDialog" aria-labelledby="dlgTitle">
+  <form class="dlg" id="dlgForm" novalidate autocomplete="off">
+    <h2 id="dlgTitle"></h2>
+    <p class="sub" id="dlgSub"></p>
+    <div class="field">
+      <label class="label" for="dlgGrams">Порция</label>
+      <div class="input-wrap"><input id="dlgGrams" type="number" inputmode="decimal" min="1" max="5000" step="any" value="100" aria-describedby="err-dlg"><span class="unit">г</span></div>
+      <p class="err" id="err-dlg" role="alert"></p>
+    </div>
+    <div class="quick" id="dlgQuick"></div>
+    <div class="preview" id="dlgPreview"></div>
+    <div class="dlg-actions">
+      <button class="btn ghost" type="button" id="dlgCancel">Отмена</button>
+      <button class="btn" type="submit">Добавить</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+
+/* ==========================================================================
+   1. CONFIG — все настройки и «магические числа» в одном месте
+   ========================================================================== */
+const CONFIG = {
+  STORAGE_PREFIX: 'nutricalc:v1:',
+
+  // Цели по умолчанию — действуют, пока не заполнен калькулятор
+  DEFAULT_GOALS: { kcal: 2000, protein: 100, fat: 70, carbs: 250 },
+
+  // Коэффициенты физической активности
+  ACTIVITY: [
+    { id: 'min',    factor: 1.2,   label: 'Минимальная — сидячая работа, без тренировок' },
+    { id: 'low',    factor: 1.375, label: 'Низкая — тренировки 1–3 раза в неделю' },
+    { id: 'medium', factor: 1.55,  label: 'Средняя — тренировки 3–5 раз в неделю' },
+    { id: 'high',   factor: 1.725, label: 'Высокая — тренировки 6–7 раз в неделю' },
+    { id: 'max',    factor: 1.9,   label: 'Очень высокая — физический труд или 2 тренировки в день' }
+  ],
+
+  // Цели: поправка к калорийности и белок на кг массы тела
+  GOALS: {
+    lose:     { label: 'Похудение',   kcalFactor: 0.85, proteinPerKg: 2.0 },
+    maintain: { label: 'Поддержание', kcalFactor: 1.0,  proteinPerKg: 1.6 },
+    gain:     { label: 'Набор массы', kcalFactor: 1.10, proteinPerKg: 1.8 }
+  },
+
+  FAT_SHARE: 0.28,                           // доля жиров в калориях
+  MIN_KCAL: { male: 1500, female: 1200 },    // нижняя граница безопасной цели
+  LIMITS: { age: [14, 100], height: [100, 250], weight: [30, 300], grams: [1, 5000] },
+
+  // Автор и контакты (используются в бегущей строке и в подвале)
+  AUTHOR: {
+    name: 'О.Л. Тимофеевна',
+    email: 'lubmila09az@gmail.com',
+    mailSubject: 'НутриКалк: сообщение автору'
+  },
+
+  // Фразы бегущей строки. Последний пункт с контактами добавляется автоматически.
+  TICKER: [
+    '💧 Пейте воду в течение дня — около 30 мл на каждый кг массы тела',
+    '🥦 Половина тарелки — овощи и зелень',
+    '🥚 Белок в каждом приёме пищи помогает дольше сохранять сытость',
+    '😴 Сон 7–9 часов помогает контролировать аппетит',
+    '🚶 Ежедневная прогулка 30 минут — простая привычка для здоровья',
+    '🍽️ Ешьте не спеша: сытость приходит через 15–20 минут',
+    '📓 Записывайте всё, что съели, — дневник делает питание заметным'
+  ],
+
+  // Продукты для кнопок «Быстро добавить» (id из FOODS_DB)
+  QUICK_FOODS: ['chicken-breast', 'egg', 'cottage', 'buckwheat', 'oats', 'apple', 'banana', 'broccoli'],
+
+  STATS_DAYS: 7,
+  ON_TARGET_TOLERANCE: 0.10,                 // «в норме» = цель ±10%
+
+  CATEGORIES: ['Мясо и птица', 'Рыба', 'Молочные и яйца', 'Крупы и хлеб', 'Овощи', 'Фрукты', 'Орехи', 'Масла', 'Сладкое'],
+
+  METRICS: [
+    { key: 'kcal',    label: 'Калории', unit: 'ккал', color: 'var(--c-kcal)' },
+    { key: 'protein', label: 'Белки',   unit: 'г',    color: 'var(--c-protein)' },
+    { key: 'fat',     label: 'Жиры',    unit: 'г',    color: 'var(--c-fat)' },
+    { key: 'carbs',   label: 'Углеводы', unit: 'г',   color: 'var(--c-carbs)' }
+  ]
+};
+
+/* ==========================================================================
+   2. FOODS_DB — база продуктов (значения на 100 г). Добавляйте строки сюда.
+   ========================================================================== */
+const FOODS_DB = [
+  // id, название, категория, ккал, белки, жиры, углеводы
+  { id: 'chicken-breast', name: 'Куриная грудка, варёная', category: 'Мясо и птица', kcal: 137, protein: 29.8, fat: 1.8,  carbs: 0.5 },
+  { id: 'beef',           name: 'Говядина, варёная',       category: 'Мясо и птица', kcal: 254, protein: 25.8, fat: 16.8, carbs: 0 },
+
+  { id: 'salmon',  name: 'Лосось, сырой',                       category: 'Рыба', kcal: 208, protein: 20.4, fat: 13.4, carbs: 0 },
+  { id: 'cod',     name: 'Треска, сырая',                       category: 'Рыба', kcal: 82,  protein: 17.8, fat: 0.7,  carbs: 0 },
+  { id: 'tuna',    name: 'Тунец консервированный в соку',       category: 'Рыба', kcal: 96,  protein: 21,   fat: 1,    carbs: 0 },
+
+  { id: 'milk',    name: 'Молоко 2,5%',        category: 'Молочные и яйца', kcal: 52,  protein: 2.8,  fat: 2.5,  carbs: 4.7 },
+  { id: 'kefir',   name: 'Кефир 1%',           category: 'Молочные и яйца', kcal: 40,  protein: 3,    fat: 1,    carbs: 4 },
+  { id: 'cottage', name: 'Творог 5%',          category: 'Молочные и яйца', kcal: 121, protein: 17.2, fat: 5,    carbs: 1.8 },
+  { id: 'cheese',  name: 'Сыр твёрдый',        category: 'Молочные и яйца', kcal: 356, protein: 24.9, fat: 27.4, carbs: 2.2 },
+  { id: 'egg',     name: 'Яйцо куриное',       category: 'Молочные и яйца', kcal: 157, protein: 12.7, fat: 11.5, carbs: 0.7 },
+
+  { id: 'buckwheat', name: 'Гречка (сухая)',            category: 'Крупы и хлеб', kcal: 313, protein: 12.6, fat: 3.3, carbs: 62.1 },
+  { id: 'oats',      name: 'Овсяные хлопья',            category: 'Крупы и хлеб', kcal: 352, protein: 12.3, fat: 6.2, carbs: 61.8 },
+  { id: 'rice',      name: 'Рис белый (сухой)',         category: 'Крупы и хлеб', kcal: 344, protein: 6.7,  fat: 0.7, carbs: 78.9 },
+  { id: 'bread',     name: 'Хлеб цельнозерновой',       category: 'Крупы и хлеб', kcal: 247, protein: 13,   fat: 3.4, carbs: 41 },
+
+  { id: 'cucumber',  name: 'Огурец',    category: 'Овощи', kcal: 15, protein: 0.8, fat: 0.1, carbs: 2.8 },
+  { id: 'tomato',    name: 'Помидор',   category: 'Овощи', kcal: 20, protein: 1.1, fat: 0.2, carbs: 3.7 },
+  { id: 'broccoli',  name: 'Брокколи',  category: 'Овощи', kcal: 34, protein: 2.8, fat: 0.4, carbs: 6.6 },
+  { id: 'carrot',    name: 'Морковь',   category: 'Овощи', kcal: 32, protein: 1.3, fat: 0.1, carbs: 6.9 },
+  { id: 'potato',    name: 'Картофель', category: 'Овощи', kcal: 77, protein: 2,   fat: 0.4, carbs: 16.3 },
+
+  { id: 'apple',  name: 'Яблоко',   category: 'Фрукты', kcal: 52, protein: 0.3, fat: 0.2, carbs: 13.8 },
+  { id: 'banana', name: 'Банан',    category: 'Фрукты', kcal: 89, protein: 1.1, fat: 0.3, carbs: 22.8 },
+  { id: 'orange', name: 'Апельсин', category: 'Фрукты', kcal: 47, protein: 0.9, fat: 0.1, carbs: 11.8 },
+
+  { id: 'almond', name: 'Миндаль',     category: 'Орехи', kcal: 579, protein: 21.2, fat: 49.9, carbs: 21.6 },
+  { id: 'walnut', name: 'Грецкий орех', category: 'Орехи', kcal: 654, protein: 15.2, fat: 65.2, carbs: 13.7 },
+
+  { id: 'olive-oil', name: 'Масло оливковое',  category: 'Масла', kcal: 884, protein: 0,   fat: 100,  carbs: 0 },
+  { id: 'butter',    name: 'Масло сливочное',  category: 'Масла', kcal: 748, protein: 0.5, fat: 82.5, carbs: 0.8 },
+
+  { id: 'dark-choc', name: 'Тёмный шоколад 70%', category: 'Сладкое', kcal: 598, protein: 7.8, fat: 42.6, carbs: 45.9 },
+  { id: 'honey',     name: 'Мёд',                 category: 'Сладкое', kcal: 304, protein: 0.3, fat: 0,    carbs: 82.4 },
+  { id: 'sugar',     name: 'Сахар',               category: 'Сладкое', kcal: 387, protein: 0,   fat: 0,    carbs: 100 }
+];
+
+/* ==========================================================================
+   3. Utils — мелкие помощники
+   ========================================================================== */
+const $  = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+const Utils = {
+  nf0: new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }),
+  nf1: new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }),
+  fmt(n, digits = 0) { return (digits ? this.nf1 : this.nf0).format(Number.isFinite(n) ? n : 0); },
+  esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); },
+  round1(n) { return Math.round(n * 10) / 10; },
+  clamp(n, a, b) { return Math.min(b, Math.max(a, n)); },
+  cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); },
+  uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); },
+  // Число из строки; поддерживает запятую как разделитель. Пусто/мусор -> NaN
+  parseNum(v) {
+    const s = String(v ?? '').trim().replace(',', '.');
+    return s === '' ? NaN : Number(s);
+  },
+  norm(s) { return String(s).toLowerCase().replace(/ё/g, 'е').trim(); },
+  debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; },
+
+  // Даты хранятся как локальные строки YYYY-MM-DD (не UTC!)
+  dateKey(d = new Date()) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  },
+  todayKey() { return this.dateKey(new Date()); },
+  parseKey(key) { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d, 12); },
+  addDays(key, n) { const d = this.parseKey(key); d.setDate(d.getDate() + n); return this.dateKey(d); },
+  lastDays(endKey, n) { return Array.from({ length: n }, (_, i) => this.addDays(endKey, i - (n - 1))); },
+  isValidKey(k) { return /^\d{4}-\d{2}-\d{2}$/.test(k) && !Number.isNaN(this.parseKey(k).getTime()); }
+};
+
+/* ==========================================================================
+   4. Store — обёртка над localStorage (с запасным вариантом в памяти,
+      если localStorage недоступен, например в приватном режиме)
+   ========================================================================== */
+const Store = (() => {
+  const P = CONFIG.STORAGE_PREFIX;
+  const mem = new Map();
+  let ok = true;
+  try { localStorage.setItem(P + '__t', '1'); localStorage.removeItem(P + '__t'); } catch { ok = false; }
+
+  return {
+    persistent: ok,
+    get(key, fallback = null) {
+      try {
+        const raw = ok ? localStorage.getItem(P + key) : mem.get(P + key);
+        return raw == null ? fallback : JSON.parse(raw);
+      } catch { return fallback; }
+    },
+    set(key, value) {
+      const raw = JSON.stringify(value);
+      try { if (ok) localStorage.setItem(P + key, raw); else mem.set(P + key, raw); }
+      catch { mem.set(P + key, raw); }
+    },
+    clearAll() {
+      mem.clear();
+      if (!ok) return;
+      Object.keys(localStorage).filter(k => k.startsWith(P)).forEach(k => localStorage.removeItem(k));
+    }
+  };
+})();
+
+/* ==========================================================================
+   5. DataService — СЛОЙ ДАННЫХ.
+      Все методы асинхронные, а UI работает только через них. Чтобы перейти
+      на API/БД, достаточно переписать тела методов (fetch вместо Store),
+      сигнатуры менять не нужно.
+   ========================================================================== */
+const DataService = {
+  // Справочник продуктов (позже: GET /api/foods)
+  async getFoods() { return FOODS_DB.slice(); },
+
+  // Профиль пользователя (позже: GET/PUT /api/profile)
+  async getProfile() { return Store.get('profile', null); },
+  async saveProfile(profile) { Store.set('profile', profile); return profile; },
+
+  // Дневник: { 'YYYY-MM-DD': [entry, ...] } (позже: GET/POST/DELETE /api/diary)
+  _diary() { const d = Store.get('diary', {}); return d && typeof d === 'object' ? d : {}; },
+  async getDay(dateKey) {
+    const d = this._diary()[dateKey];
+    return Array.isArray(d) ? d : [];
+  },
+  async getDays(dateKeys) {
+    const all = this._diary();
+    return Object.fromEntries(dateKeys.map(k => [k, Array.isArray(all[k]) ? all[k] : []]));
+  },
+  async addEntry(dateKey, entry) {
+    const all = this._diary();
+    (all[dateKey] = Array.isArray(all[dateKey]) ? all[dateKey] : []).push(entry);
+    Store.set('diary', all);
+    return entry;
+  },
+  async removeEntry(dateKey, id) {
+    const all = this._diary();
+    if (Array.isArray(all[dateKey])) {
+      all[dateKey] = all[dateKey].filter(e => e.id !== id);
+      if (!all[dateKey].length) delete all[dateKey];
+      Store.set('diary', all);
+    }
+  },
+  async importDays(map) {
+    const all = this._diary();
+    Object.entries(map).forEach(([k, list]) => { all[k] = (all[k] || []).concat(list); });
+    Store.set('diary', all);
+  },
+  async resetAll() { Store.clearAll(); }
+};
+
+/* ==========================================================================
+   6. Calc — расчёты (чистые функции без обращения к DOM)
+   ========================================================================== */
+const Calc = {
+  // Формула Миффлина — Сан Жеора, ккал/сутки в покое
+  bmr({ sex, weight, height, age }) {
+    return 10 * weight + 6.25 * height - 5 * age + (sex === 'male' ? 5 : -161);
+  },
+  bmi(weight, height) { return weight / Math.pow(height / 100, 2); },
+  bmiCategory(bmi) {
+    if (bmi < 18.5) return { cls: 'low',   label: 'Недостаток массы', hint: 'Индекс ниже нормы. Стоит обсудить питание с врачом.' };
+    if (bmi < 25)   return { cls: 'ok',    label: 'Норма',            hint: 'Индекс массы тела в пределах нормы.' };
+    if (bmi < 30)   return { cls: 'high',  label: 'Избыток массы',    hint: 'Небольшой избыток массы тела.' };
+    return               { cls: 'obese', label: 'Ожирение',         hint: 'Индекс выше нормы. Рекомендуется консультация врача.' };
+  },
+  // Цели по калориям и БЖУ из профиля
+  targets(p) {
+    const act = CONFIG.ACTIVITY.find(a => a.id === p.activity) || CONFIG.ACTIVITY[0];
+    const goal = CONFIG.GOALS[p.goal] || CONFIG.GOALS.maintain;
+    const bmr = this.bmr(p);
+    const tdee = bmr * act.factor;
+    let kcal = tdee * goal.kcalFactor;
+    const min = CONFIG.MIN_KCAL[p.sex];
+    const floorApplied = kcal < min;
+    if (floorApplied) kcal = min;
+    kcal = Math.round(kcal);
+
+    const protein = Math.round(p.weight * goal.proteinPerKg);
+    const fat = Math.round(kcal * CONFIG.FAT_SHARE / 9);
+    const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
+    const bmi = this.bmi(p.weight, p.height);
+    return { bmr: Math.round(bmr), tdee: Math.round(tdee), kcal, protein, fat, carbs, bmi, bmiCat: this.bmiCategory(bmi), floorApplied };
+  },
+  // КБЖУ порции
+  portion(food, grams) {
+    const k = grams / 100;
+    return {
+      kcal: Utils.round1(food.kcal * k), protein: Utils.round1(food.protein * k),
+      fat: Utils.round1(food.fat * k),   carbs: Utils.round1(food.carbs * k)
+    };
+  },
+  // Запись дневника хранит «снимок» значений, чтобы правки базы не меняли историю
+  makeEntry(food, grams, tsOffset = 0) {
+    return { id: Utils.uid(), foodId: food.id, name: food.name, grams, ...this.portion(food, grams), ts: Date.now() + tsOffset };
+  },
+  sumEntries(entries) {
+    return entries.reduce((s, e) => ({
+      kcal: s.kcal + e.kcal, protein: s.protein + e.protein, fat: s.fat + e.fat, carbs: s.carbs + e.carbs
+    }), { kcal: 0, protein: 0, fat: 0, carbs: 0 });
+  }
+};
+
+/* ==========================================================================
+   7. Validators — проверка форм
+   ========================================================================== */
+const Validators = {
+  profile(raw) {
+    const errors = {}, v = {};
+    if (raw.sex === 'male' || raw.sex === 'female') v.sex = raw.sex; else errors.sex = 'Выберите пол';
+
+    const num = (name, word, unit, integer) => {
+      const [min, max] = CONFIG.LIMITS[name];
+      const s = String(raw[name] ?? '').trim();
+      if (s === '') { errors[name] = `Укажите ${word}`; return; }
+      const n = Utils.parseNum(s);
+      if (!Number.isFinite(n) || n < min || n > max) { errors[name] = `${Utils.cap(word)}: от ${min} до ${max} ${unit}`; return; }
+      if (integer && !Number.isInteger(n)) { errors[name] = 'Только целое число'; return; }
+      v[name] = integer ? n : Utils.round1(n);
+    };
+    num('age', 'возраст', 'лет', true);
+    num('height', 'рост', 'см', false);
+    num('weight', 'вес', 'кг', false);
+
+    if (CONFIG.ACTIVITY.some(a => a.id === raw.activity)) v.activity = raw.activity; else errors.activity = 'Выберите активность';
+    if (CONFIG.GOALS[raw.goal]) v.goal = raw.goal; else errors.goal = 'Выберите цель';
+    return { valid: Object.keys(errors).length === 0, errors, values: v };
+  },
+  grams(raw) {
+    const [min, max] = CONFIG.LIMITS.grams;
+    const s = String(raw ?? '').trim();
+    if (s === '') return { valid: false, error: 'Укажите вес порции в граммах' };
+    const n = Utils.parseNum(s);
+    if (!Number.isFinite(n) || n < min || n > max) return { valid: false, error: `Порция: от ${min} до ${max} г` };
+    return { valid: true, value: Utils.round1(n) };
+  }
+};
+
+/* ==========================================================================
+   8. UI — общие компоненты (тост, ошибки, прогресс-бары)
+   ========================================================================== */
+const UI = {
+  _toastTimer: null,
+  toast(msg, type = '') {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  },
+  setError(inputId, errId, msg) {
+    const input = document.getElementById(inputId), err = document.getElementById(errId);
+    if (err) err.textContent = msg || '';
+    if (input) input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+  },
+  empty(icon, title, text, extra = '') {
+    return `<div class="empty"><div class="ico" aria-hidden="true">${icon}</div><h3>${Utils.esc(title)}</h3><p>${Utils.esc(text)}</p>${extra}</div>`;
+  },
+  // Строка прогресса «значение / цель»
+  progress(metric, value, goal) {
+    const pct = goal > 0 ? value / goal * 100 : 0;
+    const state = pct <= 105 ? 'ok' : pct <= 120 ? 'warn' : 'over';
+    const d = metric.key === 'kcal' ? 0 : 1;
+    const left = goal - value;
+    const foot = left >= 0
+      ? `Осталось ${Utils.fmt(left, d)} ${metric.unit}`
+      : `Превышение на ${Utils.fmt(-left, d)} ${metric.unit}`;
+    return `<div class="prog" style="--c:${metric.color}">
+      <div class="prog-head">
+        <span class="prog-name"><i class="dot"></i>${metric.label}</span>
+        <span class="prog-val"><b>${Utils.fmt(value, d)}</b> / ${Utils.fmt(goal, d)} ${metric.unit} · ${Math.round(pct)}%</span>
+      </div>
+      <div class="bar" data-state="${state}" role="progressbar" aria-label="${metric.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(Math.min(pct, 100))}"><i data-w="${Utils.clamp(pct, 0, 100).toFixed(1)}"></i></div>
+      <div class="prog-foot ${left < 0 ? 'over' : ''}">${foot}</div>
+    </div>`;
+  },
+  // Запускает анимацию заполнения полос
+  animateBars(root) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      $$('.bar > i[data-w]', root).forEach(i => { i.style.width = i.dataset.w + '%'; });
+    }));
+  }
+};
+
+/* ==========================================================================
+   9. Charts — графики на чистом SVG (без библиотек)
+   ========================================================================== */
+const Charts = {
+  NS: 'http://www.w3.org/2000/svg',
+  el(tag, attrs = {}, text) {
+    const e = document.createElementNS(this.NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+    if (text != null) e.textContent = text;
+    return e;
+  },
+  niceMax(v) {
+    if (v <= 0) return 1;
+    const exp = Math.pow(10, Math.floor(Math.log10(v))), f = v / exp;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * exp;
+  },
+  // Общая «рамка»: сетка и подписи осей. Возвращает функции масштабирования.
+  frame(width, labels, maxVal, aria) {
+    const W = Math.max(280, width || 640), H = 260;
+    const pl = 44, pr = 10, pt = 22, pb = 32;
+    const iw = W - pl - pr, ih = H - pt - pb;
+    const svg = this.el('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'chart', role: 'img', 'aria-label': aria });
+    const y = v => pt + ih - (v / maxVal) * ih;
+    const band = iw / labels.length;
+    const x = i => pl + band * i + band / 2;
+    for (let i = 0; i <= 4; i++) {
+      const val = maxVal * i / 4;
+      svg.append(this.el('line', { x1: pl, x2: W - pr, y1: y(val), y2: y(val), class: 'grid' }));
+      svg.append(this.el('text', { x: pl - 8, y: y(val) + 4, 'text-anchor': 'end' }, Utils.fmt(val, val % 1 ? 1 : 0)));
+    }
+    labels.forEach((l, i) => svg.append(this.el('text', { x: x(i), y: H - 10, 'text-anchor': 'middle' }, l)));
+    return { svg, x, y, band, W, H, pl, pr, pt, ih };
+  },
+
+  // Столбчатая диаграмма калорий с линией цели
+  bars({ width, labels, values, goal, aria }) {
+    const maxVal = this.niceMax(Math.max(goal || 0, ...values) * 1.1);
+    const f = this.frame(width, labels, maxVal, aria);
+    const bw = Math.min(44, f.band * 0.6), tol = CONFIG.ON_TARGET_TOLERANCE;
+    values.forEach((v, i) => {
+      if (v > 0) {
+        const ratio = goal ? v / goal : 1;
+        const cls = ratio < 1 - tol ? 'bar-low' : ratio > 1 + tol ? 'bar-high' : 'bar-ok';
+        const r = this.el('rect', { x: f.x(i) - bw / 2, y: f.y(v), width: bw, height: f.y(0) - f.y(v), rx: 6, class: `bar-rect ${cls}`, style: `animation-delay:${i * 60}ms` });
+        r.append(this.el('title', {}, `${labels[i]}: ${Utils.fmt(v)} ккал`));
+        f.svg.append(r);
+        f.svg.append(this.el('text', { x: f.x(i), y: f.y(v) - 6, 'text-anchor': 'middle', class: 'val' }, Utils.fmt(v)));
+      } else {
+        f.svg.append(this.el('text', { x: f.x(i), y: f.y(0) - 6, 'text-anchor': 'middle' }, '—'));
+      }
+    });
+    if (goal) {
+      f.svg.append(this.el('line', { x1: f.pl, x2: f.W - f.pr, y1: f.y(goal), y2: f.y(goal), class: 'goal' }));
+      f.svg.append(this.el('text', { x: f.W - f.pr, y: f.y(goal) - 5, 'text-anchor': 'end', class: 'goal-t' }, `цель ${Utils.fmt(goal)}`));
+    }
+    return f.svg;
+  },
+
+  // Линейный график нескольких рядов (null = нет данных, линия прерывается)
+  lines({ width, labels, series, aria }) {
+    const all = series.flatMap(s => s.values.filter(v => v != null));
+    const maxVal = this.niceMax(Math.max(1, ...all) * 1.1);
+    const f = this.frame(width, labels, maxVal, aria);
+    series.forEach(s => {
+      let d = '', pen = false;
+      s.values.forEach((v, i) => {
+        if (v == null) { pen = false; return; }
+        d += `${pen ? 'L' : 'M'}${f.x(i).toFixed(1)} ${f.y(v).toFixed(1)} `;
+        pen = true;
+      });
+      f.svg.append(this.el('path', { d, class: 'line-path', stroke: s.color }));
+      s.values.forEach((v, i) => {
+        if (v == null) return;
+        const c = this.el('circle', { cx: f.x(i), cy: f.y(v), r: 4, fill: '#fff', stroke: s.color, 'stroke-width': 2.5 });
+        c.append(this.el('title', {}, `${s.name}, ${labels[i]}: ${Utils.fmt(v, 1)} г`));
+        f.svg.append(c);
+      });
+    });
+    return f.svg;
+  }
+};
+
+/* ==========================================================================
+   10. App — состояние и роутер вкладок
+   ========================================================================== */
+const App = {
+  TABS: ['calc', 'diary', 'foods', 'stats'],
+  current: null,
+  state: { foods: [], foodsById: new Map(), profile: null, diaryDate: Utils.todayKey() },
+
+  // Актуальные цели: из профиля или значения по умолчанию
+  getGoals() {
+    if (this.state.profile) return { ...Calc.targets(this.state.profile), isDefault: false };
+    return { ...CONFIG.DEFAULT_GOALS, isDefault: true };
+  },
+  setProfile(p) { this.state.profile = p; },
+
+  async init() {
+    const [foods, profile] = await Promise.all([DataService.getFoods(), DataService.getProfile()]);
+    this.state.foods = foods;
+    this.state.foodsById = new Map(foods.map(f => [f.id, f]));
+    // Профиль из хранилища проверяем повторно — данные могли быть изменены вручную
+    const check = profile ? Validators.profile(profile) : null;
+    this.state.profile = check && check.valid ? check.values : null;
+
+    Ticker.init();
+    CalcView.init(); DiaryView.init(); FoodsView.init(); StatsView.init(); AddDialog.init();
+    window.addEventListener('hashchange', () => this.route());
+    window.addEventListener('resize', Utils.debounce(() => { if (this.current === 'stats') StatsView.drawCharts(); }, 150));
+    this.route();
+  },
+
+  route(focus = true) {
+    const id = location.hash.replace('#', '');
+    const tab = this.TABS.includes(id) ? id : 'calc';
+    this.current = tab;
+    $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
+    $$('[data-tab]').forEach(a => {
+      if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    const views = { calc: CalcView, diary: DiaryView, foods: FoodsView, stats: StatsView };
+    views[tab].onShow();
+    window.scrollTo(0, 0);
+    if (focus) { const h = $('#h-' + tab); if (h) h.focus({ preventScroll: true }); }
+  }
+};
+
+/* ==========================================================================
+   10b. Ticker — бегущая строка и контакты автора
+   ========================================================================== */
+const Ticker = {
+  mailto() {
+    const a = CONFIG.AUTHOR;
+    return `mailto:${a.email}?subject=${encodeURIComponent(a.mailSubject)}`;
+  },
+  init() {
+    const a = CONFIG.AUTHOR, href = this.mailto();
+
+    // Подвал: ФИО и ссылка для письма
+    $('#authorName').textContent = a.name;
+    $('#authorMail').textContent = a.email;
+    $('#authorMail').href = href;
+
+    // Бегущая строка: две одинаковые группы для бесшовной прокрутки
+    const contact = `✉️ Автор: ${Utils.esc(a.name)} — пишите на <a href="${Utils.esc(href)}" TABINDEX>${Utils.esc(a.email)}</a>`;
+    const items = CONFIG.TICKER.map(t => Utils.esc(t)).concat(contact);
+    const group = dup => `<div class="ticker-group"${dup ? ' aria-hidden="true"' : ''}>` +
+      items.map(i => `<span class="ticker-item">${i.replace('TABINDEX', dup ? 'tabindex="-1"' : '')}</span>`).join('') + '</div>';
+    const box = $('#ticker');
+    box.innerHTML = `<div class="ticker-track">${group(false)}${group(true)}</div>`;
+    // Скорость примерно постоянная: ~60 пикселей в секунду
+    requestAnimationFrame(() => {
+      const w = box.querySelector('.ticker-group').offsetWidth;
+      if (w) box.querySelector('.ticker-track').style.setProperty('--dur', Math.max(25, Math.round(w / 60)) + 's');
+    });
+  }
+};
+
+/* ==========================================================================
+   11. CalcView — вкладка «Калькулятор»
+   ========================================================================== */
+const CalcView = {
+  touched: new Set(),
+  shown: false,
+
+  init() {
+    this.form = $('#calcForm');
+    // Списки активности и целей строятся из CONFIG
+    $('#activity').innerHTML = CONFIG.ACTIVITY.map(a => `<option value="${a.id}">${Utils.esc(a.label)}</option>`).join('');
+    $('#goalSeg').innerHTML = Object.entries(CONFIG.GOALS).map(([id, g]) =>
+      `<input type="radio" name="goal" id="goal-${id}" value="${id}"><label for="goal-${id}">${g.label}</label>`).join('');
+
+    // Восстанавливаем сохранённый профиль или ставим значения по умолчанию
+    const p = App.state.profile;
+    this.form.elements.sex.value = p ? p.sex : 'male';
+    this.form.elements.activity.value = p ? p.activity : 'low';
+    this.form.elements.goal.value = p ? p.goal : 'maintain';
+    // Без сохранённого профиля подставляем пример, чтобы результат был виден сразу
+    const d = p || { age: 30, height: 175, weight: 70 };
+    this.saved = !!p;
+    this.form.elements.age.value = d.age; this.form.elements.height.value = d.height; this.form.elements.weight.value = d.weight;
+
+    this.form.addEventListener('input', e => { if (e.target.name) this.touched.add(e.target.name); this.update(true); });
+    this.form.addEventListener('change', () => this.update(true));
+    this.form.addEventListener('focusout', e => { if (e.target.name) { this.touched.add(e.target.name); this.update(false); } });
+    this.form.addEventListener('submit', e => e.preventDefault());
+    this.update(false);
+  },
+
+  onShow() {},
+
+  readForm() {
+    const f = this.form.elements;
+    return { sex: f.sex.value, age: f.age.value, height: f.height.value, weight: f.weight.value, activity: f.activity.value, goal: f.goal.value };
+  },
+
+  update(save) {
+    const res = Validators.profile(this.readForm());
+    // Ошибки показываем только для полей, которых уже касались
+    ['age', 'height', 'weight'].forEach(n => UI.setError(n, 'err-' + n, this.touched.has(n) ? res.errors[n] : ''));
+    const box = $('#calcResult');
+    if (res.valid) {
+      box.classList.remove('stale');
+      if (save) {
+        DataService.saveProfile(res.values);
+        App.setProfile(res.values);
+        this.saved = true;
+      }
+      this.renderResult(Calc.targets(res.values), res.values);
+    } else if (this.shown) {
+      // Прошлый результат остаётся на месте (приглушённым), пока значения исправляются
+      box.classList.add('stale');
+    } else {
+      box.innerHTML = UI.empty('🥬', 'Проверьте значения', 'Исправьте поля формы — результат появится здесь.');
+    }
+  },
+
+  renderResult(t, v) {
+    const box = $('#calcResult');
+    const goal = CONFIG.GOALS[v.goal];
+    const share = {
+      protein: Math.round(t.protein * 4 / t.kcal * 100),
+      fat: Math.round(t.fat * 9 / t.kcal * 100)
+    };
+    share.carbs = Math.max(0, 100 - share.protein - share.fat);
+    const pos = Utils.clamp((t.bmi - 15) / 25 * 100, 2, 98);
+    const tile = (m, val, sh) => `<div class="tile" style="--c:${m.color}"><div class="t-name">${m.label}</div><div class="t-val">${Utils.fmt(val)} <small>г</small></div><div class="t-share">≈ ${sh}% калорий</div></div>`;
+    const M = CONFIG.METRICS;
+
+    box.innerHTML = `
+      <div class="result-hero">
+        <div class="hero-label">Ваша цель на день · ${goal.label}</div>
+        <div class="hero-num">${Utils.fmt(t.kcal)} <small>ккал</small></div>
+        <div class="hero-sub">Основной обмен ${Utils.fmt(t.bmr)} ккал · с учётом активности ${Utils.fmt(t.tdee)} ккал</div>
+      </div>
+      ${t.floorApplied ? `<div class="warn-box">Расчёт оказался ниже безопасного минимума, поэтому цель поднята до ${Utils.fmt(t.kcal)} ккал. Не снижайте калорийность ниже без наблюдения врача.</div>` : ''}
+      <div class="macro-tiles">${tile(M[1], t.protein, share.protein)}${tile(M[2], t.fat, share.fat)}${tile(M[3], t.carbs, share.carbs)}</div>
+      <div class="bmi">
+        <div class="bmi-head">
+          <span class="label" style="margin:0">Индекс массы тела</span>
+          <span class="bmi-val tnum">${Utils.fmt(t.bmi, 1)}</span>
+          <span class="badge ${t.bmiCat.cls}">${t.bmiCat.label}</span>
+        </div>
+        <div class="bmi-track">
+          <div class="bmi-scale"><i class="b-low" style="width:14%"></i><i class="b-ok" style="width:26%"></i><i class="b-high" style="width:20%"></i><i class="b-obese" style="width:40%"></i></div>
+          <div class="bmi-marker" style="left:${pos}%"></div>
+        </div>
+        <div class="bmi-legend"><span>15</span><span>18,5</span><span>25</span><span>30</span><span>40</span></div>
+        <p class="bmi-hint">${t.bmiCat.hint}</p>
+      </div>
+      <div class="saved-note"><span>${this.saved ? '✓ Цели сохранены и используются в дневнике и статистике' : 'Это пример расчёта — введите свои данные, и цели сохранятся автоматически'}</span><a class="btn small" href="#diary">Открыть дневник</a></div>`;
+    if (!this.shown) { box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop'); this.shown = true; }
+  }
+};
+
+/* ==========================================================================
+   12. DiaryView — вкладка «Дневник»
+   ========================================================================== */
+const DiaryView = {
+  init() {
+    this.sel = $('#foodSelect'); this.grams = $('#gramsInput'); this.dateInput = $('#diaryDate');
+
+    // Список продуктов, сгруппированный по категориям
+    const groups = new Map(CONFIG.CATEGORIES.map(c => [c, []]));
+    App.state.foods.forEach(f => { if (!groups.has(f.category)) groups.set(f.category, []); groups.get(f.category).push(f); });
+    this.sel.innerHTML = '<option value="" selected>Выберите продукт…</option>' +
+      [...groups].filter(([, items]) => items.length).map(([cat, items]) =>
+        `<optgroup label="${Utils.esc(cat)}">${items.map(f => `<option value="${Utils.esc(f.id)}">${Utils.esc(f.name)} — ${f.kcal} ккал</option>`).join('')}</optgroup>`).join('');
+
+    $('#addForm').addEventListener('submit', e => { e.preventDefault(); this.add(); });
+    this.sel.addEventListener('change', () => { UI.setError('foodSelect', 'err-food', ''); this.updatePreview(); });
+    this.grams.addEventListener('input', () => { UI.setError('gramsInput', 'err-grams', ''); this.updatePreview(); });
+
+    $('#datePrev').addEventListener('click', () => this.setDate(Utils.addDays(App.state.diaryDate, -1)));
+    $('#dateNext').addEventListener('click', () => this.setDate(Utils.addDays(App.state.diaryDate, 1)));
+    $('#dateToday').addEventListener('click', () => this.setDate(Utils.todayKey()));
+    this.dateInput.addEventListener('change', () => { if (Utils.isValidKey(this.dateInput.value)) this.setDate(this.dateInput.value); });
+
+    // Удаление записи (делегирование событий)
+    $('#entryList').addEventListener('click', e => {
+      const btn = e.target.closest('[data-del]');
+      if (!btn) return;
+      const li = btn.closest('.entry');
+      li.classList.add('removing');
+      setTimeout(async () => {
+        await DataService.removeEntry(App.state.diaryDate, btn.dataset.del);
+        this.render();
+        UI.toast('Запись удалена');
+      }, 200);
+    });
+    // «Быстро добавить»: подставляет продукт и 100 г в форму
+    $('#quickChips').innerHTML = CONFIG.QUICK_FOODS.map(id => App.state.foodsById.get(id)).filter(Boolean)
+      .map(f => `<button type="button" class="chip" data-quick="${Utils.esc(f.id)}">${Utils.esc(f.name.split(',')[0])}</button>`).join('');
+    $('#quickChips').addEventListener('click', e => {
+      const b = e.target.closest('[data-quick]'); if (!b) return;
+      this.sel.value = b.dataset.quick; this.grams.value = 100;
+      UI.setError('foodSelect', 'err-food', ''); UI.setError('gramsInput', 'err-grams', '');
+      this.updatePreview();
+      this.grams.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      this.grams.focus(); this.grams.select();
+    });
+    this.updatePreview();
+  },
+
+  onShow() { this.render(); },
+
+  // Подсказка под итогами дня: что можно съесть, чтобы выйти на цель
+  tip(isToday, count, totals, goals) {
+    const left = Math.round(goals.kcal - totals.kcal);
+    if (!isToday) {
+      return count
+        ? `<b>Итог дня</b>${Utils.fmt(totals.kcal)} ккал из ${Utils.fmt(goals.kcal)} — ${Math.round(totals.kcal / goals.kcal * 100)}% от цели.`
+        : '<b>Нет записей</b>Вы можете добавить продукты и за прошедший день — просто выберите их слева.';
+    }
+    if (left < 0) return `<b>Цель по калориям выполнена</b>Превышение на ${Utils.fmt(-left)} ккал. Если захочется перекусить — выбирайте овощи и воду.`;
+    const skip = ['Масла', 'Сладкое', 'Орехи'];
+    let best = null;
+    App.state.foods.filter(f => !skip.includes(f.category)).forEach(f => {
+      const grams = f.category === 'Крупы и хлеб' ? 60 : 150, n = Calc.portion(f, grams);
+      if (n.kcal <= left && (!best || n.protein > best.n.protein)) best = { f, grams, n };
+    });
+    if (!best) return `<b>Осталось ${Utils.fmt(left)} ккал</b>Подойдёт лёгкий перекус: овощи или фрукт.`;
+    return `<b>${count ? 'Осталось' : 'На сегодня'} ${Utils.fmt(left)} ккал</b>Например: ${best.grams} г — ${Utils.esc(best.f.name.toLowerCase())} (≈ ${Utils.fmt(best.n.kcal)} ккал, белки ${Utils.fmt(best.n.protein, 1)} г).`;
+  },
+
+  setDate(key) {
+    const today = Utils.todayKey();
+    App.state.diaryDate = key > today ? today : key; // будущее недоступно
+    this.render();
+  },
+
+  updatePreview() {
+    const box = $('#addPreview');
+    const food = App.state.foodsById.get(this.sel.value);
+    const g = Validators.grams(this.grams.value);
+    if (food && g.valid) {
+      const n = Calc.portion(food, g.value);
+      box.className = 'preview';
+      box.textContent = `≈ ${Utils.fmt(n.kcal)} ккал · Б ${Utils.fmt(n.protein, 1)} · Ж ${Utils.fmt(n.fat, 1)} · У ${Utils.fmt(n.carbs, 1)}`;
+    } else {
+      box.className = 'preview muted';
+      box.textContent = 'Выберите продукт и укажите вес порции';
+    }
+  },
+
+  async add() {
+    const food = App.state.foodsById.get(this.sel.value);
+    const g = Validators.grams(this.grams.value);
+    UI.setError('foodSelect', 'err-food', food ? '' : 'Выберите продукт');
+    UI.setError('gramsInput', 'err-grams', g.valid ? '' : g.error);
+    if (!food || !g.valid) return;
+    await DataService.addEntry(App.state.diaryDate, Calc.makeEntry(food, g.value));
+    this.grams.value = '';
+    this.updatePreview();
+    UI.toast(`Добавлено: ${food.name}`);
+    this.render();
+  },
+
+  async render() {
+    const key = App.state.diaryDate, today = Utils.todayKey();
+    const entries = await DataService.getDay(key);
+    const totals = Calc.sumEntries(entries);
+    const goals = App.getGoals();
+
+    // Шапка с датой
+    this.dateInput.value = key; this.dateInput.max = today;
+    $('#dateNext').disabled = key >= today;
+    $('#dateNext').style.opacity = key >= today ? '.4' : '';
+    $('#dateToday').hidden = key === today;
+    const label = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).format(Utils.parseKey(key));
+    $('#diaryDateLabel').textContent = (key === today ? 'Сегодня, ' : '') + label;
+
+    // Прогресс по ккал и БЖУ
+    const prog = $('#dayProgress');
+    prog.innerHTML = CONFIG.METRICS.map(m => UI.progress(m, totals[m.key], goals[m.key])).join('');
+    UI.animateBars(prog);
+    $('#goalsNote').innerHTML = goals.isDefault
+      ? 'Используются цели по умолчанию. <a href="#calc">Рассчитайте свои в калькуляторе</a>.'
+      : 'Цели рассчитаны в <a href="#calc">калькуляторе</a>.';
+
+    $('#dayTip').innerHTML = this.tip(key === today, entries.length, totals, goals);
+
+    // Список записей
+    $('#entryCount').textContent = entries.length ? `${entries.length} шт.` : 'пусто';
+    const list = $('#entryList');
+    if (!entries.length) {
+      list.innerHTML = '<li>' + UI.empty('🍽️', 'Пока ничего не добавлено', key === today ? 'Выберите продукт и порцию слева — записи появятся здесь.' : 'В этот день записей нет.') + '</li>';
+      return;
+    }
+    const delIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    list.innerHTML = entries.slice().sort((a, b) => b.ts - a.ts).map(e => `
+      <li class="entry">
+        <div class="entry-main">
+          <div class="entry-name">${Utils.esc(e.name)}</div>
+          <div class="entry-meta">${Utils.fmt(e.grams, 1)} г · Б ${Utils.fmt(e.protein, 1)} · Ж ${Utils.fmt(e.fat, 1)} · У ${Utils.fmt(e.carbs, 1)}</div>
+        </div>
+        <div class="entry-kcal">${Utils.fmt(e.kcal)} <small>ккал</small></div>
+        <button type="button" class="icon-btn del" data-del="${Utils.esc(e.id)}" aria-label="Удалить: ${Utils.esc(e.name)}">${delIcon}</button>
+      </li>`).join('');
+  }
+};
+
+/* ==========================================================================
+   13. FoodsView — вкладка «Продукты»
+   ========================================================================== */
+const FoodsView = {
+  query: '', category: 'Все', sortKey: 'name', sortDir: 1,
+
+  init() {
+    const cats = ['Все', ...CONFIG.CATEGORIES.filter(c => App.state.foods.some(f => f.category === c))];
+    $('#foodChips').innerHTML = cats.map(c => `<button type="button" class="chip" data-cat="${Utils.esc(c)}" aria-pressed="${c === 'Все'}">${Utils.esc(c)}</button>`).join('');
+    $('#foodChips').addEventListener('click', e => {
+      const b = e.target.closest('[data-cat]'); if (!b) return;
+      this.category = b.dataset.cat; this.render();
+    });
+    $('#foodSearch').addEventListener('input', e => { this.query = e.target.value; this.render(); });
+    // Подсказки для пустого результата поиска
+    $('#foodTry').innerHTML = '<span class="note" style="margin:0 6px 0 0">Попробуйте:</span>' +
+      ['курица', 'яйцо', 'гречка', 'яблоко', 'масло'].map(w => `<button type="button" class="chip" data-q="${w}">${w}</button>`).join('');
+    $('#foodTry').addEventListener('click', e => {
+      const b = e.target.closest('[data-q]'); if (!b) return;
+      this.query = b.dataset.q; this.category = 'Все'; $('#foodSearch').value = this.query; this.render();
+    });
+    $('#foodReset').addEventListener('click', () => { this.query = ''; this.category = 'Все'; $('#foodSearch').value = ''; this.render(); });
+    $$('[data-sort]').forEach(b => b.addEventListener('click', () => {
+      if (this.sortKey === b.dataset.sort) this.sortDir *= -1; else { this.sortKey = b.dataset.sort; this.sortDir = b.dataset.sort === 'name' ? 1 : -1; }
+      this.render();
+    }));
+    $('#foodRows').addEventListener('click', e => {
+      const b = e.target.closest('[data-add]'); if (b) AddDialog.open(b.dataset.add);
+    });
+    this.render();
+  },
+
+  onShow() {},
+
+  render() {
+    const q = Utils.norm(this.query);
+    let items = App.state.foods.filter(f =>
+      (this.category === 'Все' || f.category === this.category) && (!q || Utils.norm(f.name).includes(q)));
+    const k = this.sortKey, dir = this.sortDir;
+    items.sort((a, b) => k === 'name' ? a.name.localeCompare(b.name, 'ru') * dir : (a[k] - b[k]) * dir);
+
+    $$('#foodChips .chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.cat === this.category)));
+    $$('[data-sort]').forEach(b => {
+      const on = b.dataset.sort === k;
+      b.querySelector('.arr').textContent = on ? (dir > 0 ? '↑' : '↓') : '';
+      b.closest('th').setAttribute('aria-sort', on ? (dir > 0 ? 'ascending' : 'descending') : 'none');
+    });
+
+    $('#foodRows').innerHTML = items.map((f, i) => `
+      <tr style="animation-delay:${Math.min(i, 12) * 20}ms">
+        <td><div class="fname">${Utils.esc(f.name)}</div><div class="fcat">${Utils.esc(f.category)}</div></td>
+        <td class="num strong">${Utils.fmt(f.kcal)}</td>
+        <td class="num">${Utils.fmt(f.protein, 1)}</td>
+        <td class="num">${Utils.fmt(f.fat, 1)}</td>
+        <td class="num">${Utils.fmt(f.carbs, 1)}</td>
+        <td class="col-act"><button type="button" class="btn small" data-add="${Utils.esc(f.id)}" aria-label="Добавить в дневник: ${Utils.esc(f.name)}">＋<span class="hide-sm"> В дневник</span></button></td>
+      </tr>`).join('');
+    $('#foodEmpty').hidden = items.length > 0;
+    $('#foodCount').textContent = items.length ? `Показано продуктов: ${items.length} из ${App.state.foods.length}. Значения на 100 г.` : '';
+  }
+};
+
+/* ==========================================================================
+   14. AddDialog — окно «Добавить в дневник» из вкладки «Продукты»
+   ========================================================================== */
+const AddDialog = {
+  food: null,
+  init() {
+    this.dlg = $('#addDialog'); this.input = $('#dlgGrams');
+    $('#dlgQuick').innerHTML = [50, 100, 150, 200].map(g => `<button type="button" class="chip" data-g="${g}">${g} г</button>`).join('');
+    $('#dlgQuick').addEventListener('click', e => { const b = e.target.closest('[data-g]'); if (b) { this.input.value = b.dataset.g; this.preview(); } });
+    this.input.addEventListener('input', () => { UI.setError('dlgGrams', 'err-dlg', ''); this.preview(); });
+    $('#dlgCancel').addEventListener('click', () => this.close());
+    this.dlg.addEventListener('click', e => { if (e.target === this.dlg) this.close(); });
+    $('#dlgForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const g = Validators.grams(this.input.value);
+      UI.setError('dlgGrams', 'err-dlg', g.valid ? '' : g.error);
+      if (!g.valid || !this.food) return;
+      await DataService.addEntry(Utils.todayKey(), Calc.makeEntry(this.food, g.value));
+      UI.toast(`Добавлено в дневник: ${this.food.name}`);
+      this.close();
+    });
+  },
+  open(foodId) {
+    this.food = App.state.foodsById.get(foodId);
+    if (!this.food) return;
+    $('#dlgTitle').textContent = this.food.name;
+    $('#dlgSub').textContent = `${this.food.category} · на 100 г: ${this.food.kcal} ккал`;
+    this.input.value = 100;
+    UI.setError('dlgGrams', 'err-dlg', '');
+    this.preview();
+    if (typeof this.dlg.showModal === 'function') this.dlg.showModal(); else this.dlg.setAttribute('open', '');
+    this.input.focus(); this.input.select();
+  },
+  close() { if (typeof this.dlg.close === 'function') this.dlg.close(); else this.dlg.removeAttribute('open'); },
+  preview() {
+    const box = $('#dlgPreview'), g = Validators.grams(this.input.value);
+    if (this.food && g.valid) {
+      const n = Calc.portion(this.food, g.value);
+      box.className = 'preview';
+      box.textContent = `≈ ${Utils.fmt(n.kcal)} ккал · Б ${Utils.fmt(n.protein, 1)} · Ж ${Utils.fmt(n.fat, 1)} · У ${Utils.fmt(n.carbs, 1)}`;
+    } else { box.className = 'preview muted'; box.textContent = 'Укажите вес порции'; }
+  }
+};
+
+/* ==========================================================================
+   15. StatsView — вкладка «Статистика»
+   ========================================================================== */
+const StatsView = {
+  cache: null,
+
+  init() {
+    $('#statsBody').addEventListener('click', async e => {
+      if (e.target.closest('[data-demo]')) { await this.seedDemo(); }
+      if (e.target.closest('[data-reset]')) {
+        if (confirm('Удалить профиль и все записи дневника? Это действие нельзя отменить.')) {
+          await DataService.resetAll();
+          location.hash = '#calc';
+          location.reload();
+        }
+      }
+    });
+  },
+
+  onShow() { this.render(); },
+
+  async render() {
+    const keys = Utils.lastDays(Utils.todayKey(), CONFIG.STATS_DAYS);
+    const map = await DataService.getDays(keys);
+    const goals = App.getGoals();
+    const wd = new Intl.DateTimeFormat('ru-RU', { weekday: 'short' });
+    let days = keys.map(k => {
+      const entries = map[k], d = Utils.parseKey(k);
+      return { key: k, label: `${wd.format(d)} ${d.getDate()}`, totals: Calc.sumEntries(entries), logged: entries.length > 0 };
+    });
+    // Если записей нет, показываем пример, чтобы экран не был пустым
+    const real = days.filter(d => d.logged);
+    const sample = !real.length;
+    if (sample) days = this.sampleDays(days, goals);
+    const logged = days.filter(d => d.logged);
+    this.cache = { days, goals };
+    const banner = sample
+      ? '<div class="sample-banner"><span><b>Это пример.</b> Добавьте продукты в дневник — здесь появятся ваши данные.</span><a class="btn small" href="#diary">Перейти к дневнику</a></div>'
+      : '';
+    const body = $('#statsBody');
+
+    const tools = `<div class="card"><div class="data-tools">
+      <p>Данные хранятся только в этом браузере.${Store.persistent ? '' : ' Сейчас хранилище недоступно, данные пропадут после закрытия вкладки.'}</p>
+      ${real.length ? '' : '<button type="button" class="btn ghost small" data-demo>Загрузить демо-данные</button>'}
+      <button type="button" class="btn ghost small danger" data-reset>Сбросить все данные</button>
+    </div></div>`;
+
+    const avg = key => logged.reduce((s, d) => s + d.totals[key], 0) / logged.length;
+    const pct = key => logged.reduce((s, d) => s + (goals[key] ? d.totals[key] / goals[key] * 100 : 0), 0) / logged.length;
+    const tol = CONFIG.ON_TARGET_TOLERANCE;
+    const onTarget = logged.filter(d => goals.kcal && Math.abs(d.totals.kcal / goals.kcal - 1) <= tol).length;
+
+    const macroCards = CONFIG.METRICS.slice(1).map(m => {
+      const p = pct(m.key);
+      return `<div class="stat" style="--c:${m.color}">
+        <div class="s-label"><span class="dot" style="display:inline-block;margin-right:6px"></span>${m.label}, среднее</div>
+        <div class="s-val">${Utils.fmt(avg(m.key), 1)} <small>г</small></div>
+        <div class="s-sub">цель ${Utils.fmt(goals[m.key])} г · ${Math.round(p)}%</div>
+      </div>`;
+    }).join('');
+
+    body.innerHTML = `
+      ${banner}
+      <div class="stat-cards">
+        <div class="stat"><div class="s-label">Среднее за день</div><div class="s-val">${Utils.fmt(avg('kcal'))} <small>ккал</small></div><div class="s-sub">цель ${Utils.fmt(goals.kcal)} ккал</div></div>
+        <div class="stat"><div class="s-label">Выполнение цели</div><div class="s-val">${Math.round(pct('kcal'))}<small>%</small></div><div class="s-sub">по калориям</div></div>
+        <div class="stat"><div class="s-label">Дней в норме</div><div class="s-val">${onTarget} <small>из ${logged.length}</small></div><div class="s-sub">цель ±${Math.round(tol * 100)}%</div></div>
+        ${macroCards}
+      </div>
+      <div class="card chart-card">
+        <div class="card-head"><h2>Калории по дням${sample ? ' · пример' : ''}</h2></div>
+        <div class="chart-box" id="chartKcal"></div>
+        <div class="legend"><span><i style="--c:#8fd1a9"></i>ниже цели</span><span><i style="--c:var(--green)"></i>в норме (±${Math.round(tol * 100)}%)</span><span><i style="--c:var(--amber)"></i>выше цели</span></div>
+      </div>
+      <div class="card chart-card">
+        <div class="card-head"><h2>Белки, жиры, углеводы (г)${sample ? ' · пример' : ''}</h2></div>
+        <div class="chart-box" id="chartMacros"></div>
+        <div class="legend">${CONFIG.METRICS.slice(1).map(m => `<span><i style="--c:${m.color}"></i>${m.label}</span>`).join('')}</div>
+      </div>
+      ${goals.isDefault ? '<p class="note" style="margin:0 0 16px">Сейчас используются цели по умолчанию — <a href="#calc" style="text-decoration:underline;color:var(--green-d);font-weight:600">рассчитайте свои</a>.</p>' : ''}
+      ${tools}`;
+    this.drawCharts();
+  },
+
+  // Условные данные для экрана без записей (в хранилище не попадают)
+  sampleDays(days, goals) {
+    const rk = [0.92, 1.05, 0.84, 1.12, 0.98, 1.0, 0.9];
+    const rp = [0.9, 1.05, 0.85, 1.1, 1.0, 0.95, 0.9];
+    const rf = [1.0, 1.1, 0.8, 1.15, 0.95, 1.05, 0.9];
+    const rc = [0.95, 1.0, 0.85, 1.1, 1.0, 0.98, 0.92];
+    return days.map((d, i) => ({
+      ...d, logged: true,
+      totals: { kcal: goals.kcal * rk[i], protein: goals.protein * rp[i], fat: goals.fat * rf[i], carbs: goals.carbs * rc[i] }
+    }));
+  },
+
+  // Графики рисуются по реальной ширине контейнера — шрифты остаются читаемыми на телефоне
+  drawCharts() {
+    if (!this.cache) return;
+    const { days, goals } = this.cache;
+    const a = $('#chartKcal'), b = $('#chartMacros');
+    if (!a || !b) return;
+    const labels = days.map(d => d.label);
+    a.replaceChildren(Charts.bars({
+      width: a.clientWidth, labels, goal: goals.kcal,
+      values: days.map(d => Math.round(d.totals.kcal)),
+      aria: 'Столбчатая диаграмма калорий за 7 дней'
+    }));
+    b.replaceChildren(Charts.lines({
+      width: b.clientWidth, labels, aria: 'График белков, жиров и углеводов за 7 дней',
+      series: CONFIG.METRICS.slice(1).map(m => ({
+        name: m.label,
+        color: getComputedStyle(document.documentElement).getPropertyValue(m.color.slice(4, -1)).trim() || '#888',
+        values: days.map(d => d.logged ? Utils.round1(d.totals[m.key]) : null)
+      }))
+    }));
+  },
+
+  // Демо-данные: 6 прошлых дней со случайными продуктами (один день пропущен)
+  async seedDemo() {
+    const goals = App.getGoals(), foods = App.state.foods, data = {};
+    for (let i = 6; i >= 1; i--) {
+      if (i === 3) continue;
+      const key = Utils.addDays(Utils.todayKey(), -i);
+      const target = goals.kcal * (0.78 + Math.random() * 0.42);
+      const list = []; let sum = 0, guard = 0;
+      while (sum < target && guard++ < 14) {
+        const f = foods[Math.floor(Math.random() * foods.length)];
+        const fatty = f.kcal > 500;
+        const grams = fatty ? (1 + Math.floor(Math.random() * 3)) * 10 : (3 + Math.floor(Math.random() * 14)) * 10;
+        const entry = Calc.makeEntry(f, grams, list.length);
+        list.push(entry); sum += entry.kcal;
+      }
+      data[key] = list;
+    }
+    await DataService.importDays(data);
+    UI.toast('Демо-данные загружены');
+    this.render();
+  }
+};
+
+/* ==========================================================================
+   Запуск
+   ========================================================================== */
+App.init();
+</script>
+</body>
+</html>
